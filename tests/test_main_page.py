@@ -45,5 +45,4 @@ def test_main_page_validate_relevant_users_of_selected_page_after_refresh(main_p
     assert main_page.strip_white_space(actual_users) == main_page.strip_white_space(expected_users)
     main_page.reload_page()
     actual_users_after_reloading_the_page = main_page.get_users_on_page()
-    assert main_page.strip_white_space(actual_users_after_reloading_the_page) != main_page.strip_white_space(
-        expected_users)
+    assert main_page.strip_white_space(actual_users_after_reloading_the_page) != main_page.strip_white_space(expected_users)
