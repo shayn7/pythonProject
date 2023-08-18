@@ -1,4 +1,5 @@
 Project structure
+
 Project implements Page Object Model architecture.
 
 tests: definition of test suites and scenarios
