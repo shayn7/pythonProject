@@ -36,6 +36,9 @@ To run all the scripts with default setting simply type:
 
 pytest
 
+To run all tests and generate html report:
+
+pytest --html=report.html
 
 Running specific test:
 

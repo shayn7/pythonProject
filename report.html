@@ -1,0 +1,382 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset="utf-8"/>
+    <title>report.html</title>
+    <link href="assets/style.css" rel="stylesheet" type="text/css"/></head>
+  <body onLoad="init()">
+    <script>/* This Source Code Form is subject to the terms of the Mozilla Public
+ * License, v. 2.0. If a copy of the MPL was not distributed with this file,
+ * You can obtain one at http://mozilla.org/MPL/2.0/. */
+
+
+function toArray(iter) {
+    if (iter === null) {
+        return null;
+    }
+    return Array.prototype.slice.call(iter);
+}
+
+function find(selector, elem) { // eslint-disable-line no-redeclare
+    if (!elem) {
+        elem = document;
+    }
+    return elem.querySelector(selector);
+}
+
+function findAll(selector, elem) {
+    if (!elem) {
+        elem = document;
+    }
+    return toArray(elem.querySelectorAll(selector));
+}
+
+function sortColumn(elem) {
+    toggleSortStates(elem);
+    const colIndex = toArray(elem.parentNode.childNodes).indexOf(elem);
+    let key;
+    if (elem.classList.contains('result')) {
+        key = keyResult;
+    } else if (elem.classList.contains('links')) {
+        key = keyLink;
+    } else {
+        key = keyAlpha;
+    }
+    sortTable(elem, key(colIndex));
+}
+
+function showAllExtras() { // eslint-disable-line no-unused-vars
+    findAll('.col-result').forEach(showExtras);
+}
+
+function hideAllExtras() { // eslint-disable-line no-unused-vars
+    findAll('.col-result').forEach(hideExtras);
+}
+
+function showExtras(colresultElem) {
+    const extras = colresultElem.parentNode.nextElementSibling;
+    const expandcollapse = colresultElem.firstElementChild;
+    extras.classList.remove('collapsed');
+    expandcollapse.classList.remove('expander');
+    expandcollapse.classList.add('collapser');
+}
+
+function hideExtras(colresultElem) {
+    const extras = colresultElem.parentNode.nextElementSibling;
+    const expandcollapse = colresultElem.firstElementChild;
+    extras.classList.add('collapsed');
+    expandcollapse.classList.remove('collapser');
+    expandcollapse.classList.add('expander');
+}
+
+function showFilters() {
+    let visibleString = getQueryParameter('visible') || 'all';
+    visibleString = visibleString.toLowerCase();
+    const checkedItems = visibleString.split(',');
+
+    const filterItems = document.getElementsByClassName('filter');
+    for (let i = 0; i < filterItems.length; i++) {
+        filterItems[i].hidden = false;
+
+        if (visibleString != 'all') {
+            filterItems[i].checked = checkedItems.includes(filterItems[i].getAttribute('data-test-result'));
+            filterTable(filterItems[i]);
+        }
+    }
+}
+
+function addCollapse() {
+    // Add links for show/hide all
+    const resulttable = find('table#results-table');
+    const showhideall = document.createElement('p');
+    showhideall.innerHTML = '<a href="javascript:showAllExtras()">Show all details</a> / ' +
+                            '<a href="javascript:hideAllExtras()">Hide all details</a>';
+    resulttable.parentElement.insertBefore(showhideall, resulttable);
+
+    // Add show/hide link to each result
+    findAll('.col-result').forEach(function(elem) {
+        const collapsed = getQueryParameter('collapsed') || 'Passed';
+        const extras = elem.parentNode.nextElementSibling;
+        const expandcollapse = document.createElement('span');
+        if (extras.classList.contains('collapsed')) {
+            expandcollapse.classList.add('expander');
+        } else if (collapsed.includes(elem.innerHTML)) {
+            extras.classList.add('collapsed');
+            expandcollapse.classList.add('expander');
+        } else {
+            expandcollapse.classList.add('collapser');
+        }
+        elem.appendChild(expandcollapse);
+
+        elem.addEventListener('click', function(event) {
+            if (event.currentTarget.parentNode.nextElementSibling.classList.contains('collapsed')) {
+                showExtras(event.currentTarget);
+            } else {
+                hideExtras(event.currentTarget);
+            }
+        });
+    });
+}
+
+function getQueryParameter(name) {
+    const match = RegExp('[?&]' + name + '=([^&]*)').exec(window.location.search);
+    return match && decodeURIComponent(match[1].replace(/\+/g, ' '));
+}
+
+function init () { // eslint-disable-line no-unused-vars
+    resetSortHeaders();
+
+    addCollapse();
+
+    showFilters();
+
+    sortColumn(find('.initial-sort'));
+
+    findAll('.sortable').forEach(function(elem) {
+        elem.addEventListener('click',
+            function() {
+                sortColumn(elem);
+            }, false);
+    });
+}
+
+function sortTable(clicked, keyFunc) {
+    const rows = findAll('.results-table-row');
+    const reversed = !clicked.classList.contains('asc');
+    const sortedRows = sort(rows, keyFunc, reversed);
+    /* Whole table is removed here because browsers acts much slower
+     * when appending existing elements.
+     */
+    const thead = document.getElementById('results-table-head');
+    document.getElementById('results-table').remove();
+    const parent = document.createElement('table');
+    parent.id = 'results-table';
+    parent.appendChild(thead);
+    sortedRows.forEach(function(elem) {
+        parent.appendChild(elem);
+    });
+    document.getElementsByTagName('BODY')[0].appendChild(parent);
+}
+
+function sort(items, keyFunc, reversed) {
+    const sortArray = items.map(function(item, i) {
+        return [keyFunc(item), i];
+    });
+
+    sortArray.sort(function(a, b) {
+        const keyA = a[0];
+        const keyB = b[0];
+
+        if (keyA == keyB) return 0;
+
+        if (reversed) {
+            return keyA < keyB ? 1 : -1;
+        } else {
+            return keyA > keyB ? 1 : -1;
+        }
+    });
+
+    return sortArray.map(function(item) {
+        const index = item[1];
+        return items[index];
+    });
+}
+
+function keyAlpha(colIndex) {
+    return function(elem) {
+        return elem.childNodes[1].childNodes[colIndex].firstChild.data.toLowerCase();
+    };
+}
+
+function keyLink(colIndex) {
+    return function(elem) {
+        const dataCell = elem.childNodes[1].childNodes[colIndex].firstChild;
+        return dataCell == null ? '' : dataCell.innerText.toLowerCase();
+    };
+}
+
+function keyResult(colIndex) {
+    return function(elem) {
+        const strings = ['Error', 'Failed', 'Rerun', 'XFailed', 'XPassed',
+            'Skipped', 'Passed'];
+        return strings.indexOf(elem.childNodes[1].childNodes[colIndex].firstChild.data);
+    };
+}
+
+function resetSortHeaders() {
+    findAll('.sort-icon').forEach(function(elem) {
+        elem.parentNode.removeChild(elem);
+    });
+    findAll('.sortable').forEach(function(elem) {
+        const icon = document.createElement('div');
+        icon.className = 'sort-icon';
+        icon.textContent = 'vvv';
+        elem.insertBefore(icon, elem.firstChild);
+        elem.classList.remove('desc', 'active');
+        elem.classList.add('asc', 'inactive');
+    });
+}
+
+function toggleSortStates(elem) {
+    //if active, toggle between asc and desc
+    if (elem.classList.contains('active')) {
+        elem.classList.toggle('asc');
+        elem.classList.toggle('desc');
+    }
+
+    //if inactive, reset all other functions and add ascending active
+    if (elem.classList.contains('inactive')) {
+        resetSortHeaders();
+        elem.classList.remove('inactive');
+        elem.classList.add('active');
+    }
+}
+
+function isAllRowsHidden(value) {
+    return value.hidden == false;
+}
+
+function filterTable(elem) { // eslint-disable-line no-unused-vars
+    const outcomeAtt = 'data-test-result';
+    const outcome = elem.getAttribute(outcomeAtt);
+    const classOutcome = outcome + ' results-table-row';
+    const outcomeRows = document.getElementsByClassName(classOutcome);
+
+    for(let i = 0; i < outcomeRows.length; i++){
+        outcomeRows[i].hidden = !elem.checked;
+    }
+
+    const rows = findAll('.results-table-row').filter(isAllRowsHidden);
+    const allRowsHidden = rows.length == 0 ? true : false;
+    const notFoundMessage = document.getElementById('not-found-message');
+    notFoundMessage.hidden = !allRowsHidden;
+}
+</script>
+    <h1>report.html</h1>
+    <p>Report generated on 21-Aug-2023 at 16:09:22 by <a href="https://pypi.python.org/pypi/pytest-html">pytest-html</a> v3.2.0</p>
+    <h2>Summary</h2>
+    <p>10 tests ran in 17.20 seconds. </p>
+    <p class="filter" hidden="true">(Un)check the boxes to filter the results.</p><input checked="true" class="filter" data-test-result="passed" disabled="true" hidden="true" name="filter_checkbox" onChange="filterTable(this)" type="checkbox"/><span class="passed">0 passed</span>, <input checked="true" class="filter" data-test-result="skipped" disabled="true" hidden="true" name="filter_checkbox" onChange="filterTable(this)" type="checkbox"/><span class="skipped">0 skipped</span>, <input checked="true" class="filter" data-test-result="failed" hidden="true" name="filter_checkbox" onChange="filterTable(this)" type="checkbox"/><span class="failed">10 failed</span>, <input checked="true" class="filter" data-test-result="error" disabled="true" hidden="true" name="filter_checkbox" onChange="filterTable(this)" type="checkbox"/><span class="error">0 errors</span>, <input checked="true" class="filter" data-test-result="xfailed" disabled="true" hidden="true" name="filter_checkbox" onChange="filterTable(this)" type="checkbox"/><span class="xfailed">0 expected failures</span>, <input checked="true" class="filter" data-test-result="xpassed" disabled="true" hidden="true" name="filter_checkbox" onChange="filterTable(this)" type="checkbox"/><span class="xpassed">0 unexpected passes</span>
+    <h2>Results</h2>
+    <table id="results-table">
+      <thead id="results-table-head">
+        <tr>
+          <th class="sortable result initial-sort" col="result">Result</th>
+          <th class="sortable" col="name">Test</th>
+          <th class="sortable" col="duration">Duration</th>
+          <th class="sortable links" col="links">Links</th></tr>
+        <tr hidden="true" id="not-found-message">
+          <th colspan="4">No results found. Try to check the filters</th></tr></thead>
+      <tbody class="failed results-table-row">
+        <tr>
+          <td class="col-result">Failed</td>
+          <td class="col-name">tests/test_add_new_member_page.py::test_add_new_member_page_user_gets_unused_id[chromium]</td>
+          <td class="col-duration">4.27</td>
+          <td class="col-links"></td></tr>
+        <tr>
+          <td class="extra" colspan="4">
+            <div><div><img src=".playwright-screenshots/tests-test-add-new-member-page-py-test-add-new-member-page-user-gets-unused-id-chromium.png" style="width:600px;height:228px;" onclick="window.open(this.src)" align="right"/></div></div>
+            <div class="log">main_page = &lt;pages.page_objects.main_page.MainPage object at 0x1087ca4d0&gt;<br/>add_new_member_page = &lt;pages.page_objects.add_new_member_page.AddNewMemberPage object at 0x10882c390&gt;<br/><br/>    def test_add_new_member_page_user_gets_unused_id(main_page: MainPage, add_new_member_page: AddNewMemberPage) -&gt; None:<br/>        main_page.go_to_page()<br/>        expect(main_page.table_header).to_be_visible()<br/>        main_page.click_on_add_person()<br/>        expect(add_new_member_page.add_new_member_window).to_be_visible()<br/>        add_new_member_page.add_new_user(&quot;george&quot;, &quot;costenza&quot;)<br/>        main_page.set_text(&quot;11&quot;)<br/>        page_info = main_page.get_all_data_for_a_column(&quot;ID&quot;)<br/>        print(page_info)<br/>&gt;       assert &#x27;1&#x27; not in page_info<br/><span class="error">E       AssertionError: assert &#x27;1&#x27; not in [&#x27;1&#x27;, &#x27;1&#x27;, &#x27;1&#x27;, &#x27;1&#x27;, &#x27;1&#x27;]</span><br/><br/>tests/test_add_new_member_page.py:16: AssertionError<br/> ------------------------------Captured stdout call------------------------------ <br/>[&#x27;1&#x27;, &#x27;1&#x27;, &#x27;1&#x27;, &#x27;1&#x27;, &#x27;1&#x27;]
+<br/></div></td></tr></tbody>
+      <tbody class="failed results-table-row">
+        <tr>
+          <td class="col-result">Failed</td>
+          <td class="col-name">tests/test_add_new_member_page.py::test_add_new_member_page_add_user_with_number_in_name_field[chromium]</td>
+          <td class="col-duration">1.52</td>
+          <td class="col-links"></td></tr>
+        <tr>
+          <td class="extra" colspan="4">
+            <div><div><img src=".playwright-screenshots/tests-test-add-new-member-page-py-test-add-new-member-page-add-user-with-number-in-name-field-chromium.png" style="width:600px;height:228px;" onclick="window.open(this.src)" align="right"/></div></div>
+            <div class="log">main_page = &lt;pages.page_objects.main_page.MainPage object at 0x108899710&gt;<br/>add_new_member_page = &lt;pages.page_objects.add_new_member_page.AddNewMemberPage object at 0x10889a850&gt;<br/><br/>    def test_add_new_member_page_add_user_with_number_in_name_field(main_page: MainPage,<br/>                                                                    add_new_member_page: AddNewMemberPage) -&gt; None:<br/>        main_page.go_to_page()<br/>        expect(main_page.table_header).to_be_visible()<br/>        main_page.click_on_add_person()<br/>        expect(add_new_member_page.add_new_member_window).to_be_visible()<br/>        add_new_member_page.add_new_user(&quot;33&quot;, &quot;costenza&quot;)<br/>        main_page.set_text(&quot;11&quot;)<br/>        name_data = main_page.get_all_data_for_a_column(&quot;Name&quot;)<br/>        family_data = main_page.get_all_data_for_a_column(&quot;Family&quot;)<br/>        print(name_data)<br/>        print(family_data)<br/>        assert &quot;33&quot; not in name_data<br/>&gt;       assert &quot;33&quot; not in family_data<br/><span class="error">E       AssertionError: assert &#x27;33&#x27; not in [&#x27;george&#x27;, &#x27;33&#x27;, &#x27;george329&#x27;, &#x27;gegeorgegeorgegeorgegeorgeorgegeorgegeorgegeorgegeorgegeorgegeorgegeorge&#x27;, &#x27;george&#x27;, &#x27;33&#x27;]</span><br/><br/>tests/test_add_new_member_page.py:32: AssertionError<br/> ------------------------------Captured stdout call------------------------------ <br/>[&#x27;costenza&#x27;, &#x27;costenza&#x27;, &#x27;costenza329&#x27;, &#x27;costenzacostenzacostenzacostenzacostenzacostenzacostenzacostenzacostenzacostenza&#x27;, &#x27;costenza&#x27;, &#x27;costenza&#x27;]
+[&#x27;george&#x27;, &#x27;33&#x27;, &#x27;george329&#x27;, &#x27;gegeorgegeorgegeorgegeorgeorgegeorgegeorgegeorgegeorgegeorgegeorgegeorge&#x27;, &#x27;george&#x27;, &#x27;33&#x27;]
+<br/></div></td></tr></tbody>
+      <tbody class="failed results-table-row">
+        <tr>
+          <td class="col-result">Failed</td>
+          <td class="col-name">tests/test_add_new_member_page.py::test_add_new_member_page_verify_user_entered_with_correct_info[chromium]</td>
+          <td class="col-duration">1.49</td>
+          <td class="col-links"></td></tr>
+        <tr>
+          <td class="extra" colspan="4">
+            <div><div><img src=".playwright-screenshots/tests-test-add-new-member-page-py-test-add-new-member-page-verify-user-entered-with-correct-info-chromium.png" style="width:600px;height:228px;" onclick="window.open(this.src)" align="right"/></div></div>
+            <div class="log">main_page = &lt;pages.page_objects.main_page.MainPage object at 0x1088cdb50&gt;<br/>add_new_member_page = &lt;pages.page_objects.add_new_member_page.AddNewMemberPage object at 0x10889b150&gt;<br/><br/>    def test_add_new_member_page_verify_user_entered_with_correct_info(main_page: MainPage,<br/>                                                                       add_new_member_page: AddNewMemberPage) -&gt; None:<br/>        main_page.go_to_page()<br/>        expect(main_page.table_header).to_be_visible()<br/>        main_page.click_on_add_person()<br/>        expect(add_new_member_page.add_new_member_window).to_be_visible()<br/>        num = random.randint(0, 1000)<br/>        add_new_member_page.add_new_user(&quot;george&quot; + str(num), &quot;costenza&quot; + str(num))<br/>        main_page.set_text(&quot;11&quot;)<br/>        name_data = main_page.get_all_data_for_a_column(&quot;Name&quot;)<br/>        family_data = main_page.get_all_data_for_a_column(&quot;Family&quot;)<br/>        print(name_data)<br/>        print(family_data)<br/>&gt;       assert &quot;george&quot; + str(num) in name_data<br/><span class="error">E       AssertionError: assert (&#x27;george&#x27; + &#x27;965&#x27;) in [&#x27;costenza&#x27;, &#x27;costenza&#x27;, &#x27;costenza329&#x27;, &#x27;costenzacostenzacostenzacostenzacostenzacostenzacostenzacostenzacostenzacostenza&#x27;, &#x27;costenza&#x27;, &#x27;costenza&#x27;, ...]</span><br/><span class="error">E        +  where &#x27;965&#x27; = str(965)</span><br/><br/>tests/test_add_new_member_page.py:48: AssertionError<br/> ------------------------------Captured stdout call------------------------------ <br/>[&#x27;costenza&#x27;, &#x27;costenza&#x27;, &#x27;costenza329&#x27;, &#x27;costenzacostenzacostenzacostenzacostenzacostenzacostenzacostenzacostenzacostenza&#x27;, &#x27;costenza&#x27;, &#x27;costenza&#x27;, &#x27;costenza965&#x27;]
+[&#x27;george&#x27;, &#x27;33&#x27;, &#x27;george329&#x27;, &#x27;gegeorgegeorgegeorgegeorgeorgegeorgegeorgegeorgegeorgegeorgegeorgegeorge&#x27;, &#x27;george&#x27;, &#x27;33&#x27;, &#x27;george965&#x27;]
+<br/></div></td></tr></tbody>
+      <tbody class="failed results-table-row">
+        <tr>
+          <td class="col-result">Failed</td>
+          <td class="col-name">tests/test_add_new_member_page.py::test_add_new_member_page_add_user_with_large_amount_of_characters[chromium]</td>
+          <td class="col-duration">1.31</td>
+          <td class="col-links"></td></tr>
+        <tr>
+          <td class="extra" colspan="4">
+            <div><div><img src=".playwright-screenshots/tests-test-add-new-member-page-py-test-add-new-member-page-add-user-with-large-amount-of-characters-chromium.png" style="width:600px;height:228px;" onclick="window.open(this.src)" align="right"/></div></div>
+            <div class="log">main_page = &lt;pages.page_objects.main_page.MainPage object at 0x1088e19d0&gt;<br/>add_new_member_page = &lt;pages.page_objects.add_new_member_page.AddNewMemberPage object at 0x1087c8dd0&gt;<br/><br/>    def test_add_new_member_page_add_user_with_large_amount_of_characters(main_page: MainPage,<br/>                                                                          add_new_member_page: AddNewMemberPage) -&gt; None:<br/>        main_page.go_to_page()<br/>        expect(main_page.table_header).to_be_visible()<br/>        main_page.click_on_add_person()<br/>        expect(add_new_member_page.add_new_member_window).to_be_visible()<br/>        add_new_member_page.add_new_user(&quot;gegeorgegeorgegeorgegeorgeorgegeorgegeorgegeorgegeorgegeorgegeorgegeorge&quot;,<br/>                                         &quot;costenzacostenzacostenzacostenzacostenzacostenzacostenzacostenzacostenzacostenza&quot;)<br/>        main_page.set_text(&quot;11&quot;)<br/>        name_data = main_page.get_all_data_for_a_column(&quot;Name&quot;)<br/>        family_data = main_page.get_all_data_for_a_column(&quot;Family&quot;)<br/>        print(name_data)<br/>        print(family_data)<br/>&gt;       assert &#x27;costenzacostenzacostenzacostenzacostenzacostenzacostenzacostenzacostenzacostenza&#x27; not in name_data<br/><span class="error">E       AssertionError: assert &#x27;costenzacostenzacostenzacostenzacostenzacostenzacostenzacostenzacostenzacostenza&#x27; not in [&#x27;costenza&#x27;, &#x27;costenza&#x27;, &#x27;costenza329&#x27;, &#x27;costenzacostenzacostenzacostenzacostenzacostenzacostenzacostenzacostenzacostenza&#x27;, &#x27;costenza&#x27;, &#x27;costenza&#x27;, ...]</span><br/><br/>tests/test_add_new_member_page.py:65: AssertionError<br/> ------------------------------Captured stdout call------------------------------ <br/>[&#x27;costenza&#x27;, &#x27;costenza&#x27;, &#x27;costenza329&#x27;, &#x27;costenzacostenzacostenzacostenzacostenzacostenzacostenzacostenzacostenzacostenza&#x27;, &#x27;costenza&#x27;, &#x27;costenza&#x27;, &#x27;costenza965&#x27;, &#x27;costenzacostenzacostenzacostenzacostenzacostenzacostenzacostenzacostenzacostenza&#x27;]
+[&#x27;george&#x27;, &#x27;33&#x27;, &#x27;george329&#x27;, &#x27;gegeorgegeorgegeorgegeorgeorgegeorgegeorgegeorgegeorgegeorgegeorgegeorge&#x27;, &#x27;george&#x27;, &#x27;33&#x27;, &#x27;george965&#x27;, &#x27;gegeorgegeorgegeorgegeorgeorgegeorgegeorgegeorgegeorgegeorgegeorgegeorge&#x27;]
+<br/></div></td></tr></tbody>
+      <tbody class="failed results-table-row">
+        <tr>
+          <td class="col-result">Failed</td>
+          <td class="col-name">tests/test_main_page.py::test_main_page_validate_page_4_info[chromium]</td>
+          <td class="col-duration">0.75</td>
+          <td class="col-links"></td></tr>
+        <tr>
+          <td class="extra" colspan="4">
+            <div><div><img src=".playwright-screenshots/tests-test-main-page-py-test-main-page-validate-page-4-info-chromium.png" style="width:600px;height:228px;" onclick="window.open(this.src)" align="right"/></div></div>
+            <div class="log">main_page = &lt;pages.page_objects.main_page.MainPage object at 0x10889a1d0&gt;<br/><br/>    def test_main_page_validate_page_4_info(main_page: MainPage) -&gt; None:<br/>        main_page.go_to_page()<br/>        expect(main_page.table_header).to_be_visible()<br/>        main_page.set_text(&quot;4&quot;)<br/>        page_info = main_page.get_all_data_for_a_column(&quot;Name&quot;)<br/>        print(page_info)<br/>&gt;       assert &quot;Data can&#x27;t be processed&quot; not in page_info<br/><span class="error">E       assert &quot;Data can&#x27;t be processed&quot; not in [&quot;Data can&#x27;t be processed&quot;]</span><br/><br/>tests/test_main_page.py:12: AssertionError<br/> ------------------------------Captured stdout call------------------------------ <br/>[&quot;Data can&#x27;t be processed&quot;]
+<br/></div></td></tr></tbody>
+      <tbody class="failed results-table-row">
+        <tr>
+          <td class="col-result">Failed</td>
+          <td class="col-name">tests/test_main_page.py::test_main_page_navigate_to_page_4_using_arrow_button[chromium]</td>
+          <td class="col-duration">0.78</td>
+          <td class="col-links"></td></tr>
+        <tr>
+          <td class="extra" colspan="4">
+            <div><div><img src=".playwright-screenshots/tests-test-main-page-py-test-main-page-navigate-to-page-4-using-arrow-button-chromium.png" style="width:600px;height:228px;" onclick="window.open(this.src)" align="right"/></div></div>
+            <div class="log">main_page = &lt;pages.page_objects.main_page.MainPage object at 0x1088640d0&gt;<br/><br/>    def test_main_page_navigate_to_page_4_using_arrow_button(main_page: MainPage) -&gt; None:<br/>        main_page.go_to_page()<br/>        expect(main_page.table_header).to_be_visible()<br/>        main_page.set_text(&quot;3&quot;)<br/>        main_page.click_on_right_arrow()<br/>        page_info = main_page.get_all_data_for_a_column(&quot;Name&quot;)<br/>        print(page_info)<br/>&gt;       assert &quot;Data can&#x27;t be processed&quot; not in page_info<br/><span class="error">E       assert &quot;Data can&#x27;t be processed&quot; not in [&quot;Data can&#x27;t be processed&quot;]</span><br/><br/>tests/test_main_page.py:22: AssertionError<br/> ------------------------------Captured stdout call------------------------------ <br/>[&quot;Data can&#x27;t be processed&quot;]
+<br/></div></td></tr></tbody>
+      <tbody class="failed results-table-row">
+        <tr>
+          <td class="col-result">Failed</td>
+          <td class="col-name">tests/test_main_page.py::test_main_page_navigate_to_page_7_using_arrow_button[chromium]</td>
+          <td class="col-duration">0.90</td>
+          <td class="col-links"></td></tr>
+        <tr>
+          <td class="extra" colspan="4">
+            <div><div><img src=".playwright-screenshots/tests-test-main-page-py-test-main-page-navigate-to-page-7-using-arrow-button-chromium.png" style="width:600px;height:228px;" onclick="window.open(this.src)" align="right"/></div></div>
+            <div class="log">main_page = &lt;pages.page_objects.main_page.MainPage object at 0x108906f90&gt;<br/><br/>    def test_main_page_navigate_to_page_7_using_arrow_button(main_page: MainPage) -&gt; None:<br/>        main_page.go_to_page()<br/>        expect(main_page.table_header).to_be_visible()<br/>        main_page.set_text(&quot;6&quot;)<br/>        main_page.click_on_right_arrow()<br/>        page_info = main_page.get_all_data_for_a_column(&quot;ID&quot;)<br/>        print(page_info)<br/>&gt;       assert &#x27;70&#x27; in page_info<br/><span class="error">E       AssertionError: assert &#x27;70&#x27; in [&#x27;51&#x27;, &#x27;52&#x27;, &#x27;53&#x27;, &#x27;54&#x27;, &#x27;55&#x27;, &#x27;56&#x27;, ...]</span><br/><br/>tests/test_main_page.py:32: AssertionError<br/> ------------------------------Captured stdout call------------------------------ <br/>[&#x27;51&#x27;, &#x27;52&#x27;, &#x27;53&#x27;, &#x27;54&#x27;, &#x27;55&#x27;, &#x27;56&#x27;, &#x27;57&#x27;, &#x27;58&#x27;, &#x27;59&#x27;, &#x27;60&#x27;]
+<br/></div></td></tr></tbody>
+      <tbody class="failed results-table-row">
+        <tr>
+          <td class="col-result">Failed</td>
+          <td class="col-name">tests/test_main_page.py::test_main_page_navigate_to_page_10_using_arrow_button[chromium]</td>
+          <td class="col-duration">1.23</td>
+          <td class="col-links"></td></tr>
+        <tr>
+          <td class="extra" colspan="4">
+            <div><div><img src=".playwright-screenshots/tests-test-main-page-py-test-main-page-navigate-to-page-10-using-arrow-button-chromium.png" style="width:600px;height:228px;" onclick="window.open(this.src)" align="right"/></div></div>
+            <div class="log">main_page = &lt;pages.page_objects.main_page.MainPage object at 0x1088fc2d0&gt;<br/><br/>    def test_main_page_navigate_to_page_10_using_arrow_button(main_page: MainPage) -&gt; None:<br/>        main_page.go_to_page()<br/>        expect(main_page.table_header).to_be_visible()<br/>        main_page.set_text(&quot;9&quot;)<br/>        main_page.click_on_right_arrow()<br/>        page_info = main_page.get_all_data_for_a_column(&quot;ID&quot;)<br/>        print(page_info)<br/>&gt;       assert &#x27;91&#x27; in page_info<br/><span class="error">E       AssertionError: assert &#x27;91&#x27; in [&#x27;81&#x27;, &#x27;82&#x27;, &#x27;83&#x27;, &#x27;84&#x27;, &#x27;85&#x27;, &#x27;86&#x27;, ...]</span><br/><br/>tests/test_main_page.py:42: AssertionError<br/> ------------------------------Captured stdout call------------------------------ <br/>[&#x27;81&#x27;, &#x27;82&#x27;, &#x27;83&#x27;, &#x27;84&#x27;, &#x27;85&#x27;, &#x27;86&#x27;, &#x27;87&#x27;, &#x27;88&#x27;, &#x27;89&#x27;, &#x27;90&#x27;]
+<br/></div></td></tr></tbody>
+      <tbody class="failed results-table-row">
+        <tr>
+          <td class="col-result">Failed</td>
+          <td class="col-name">tests/test_main_page.py::test_main_page_validate_page_10_info[chromium]</td>
+          <td class="col-duration">0.74</td>
+          <td class="col-links"></td></tr>
+        <tr>
+          <td class="extra" colspan="4">
+            <div><div><img src=".playwright-screenshots/tests-test-main-page-py-test-main-page-validate-page-10-info-chromium.png" style="width:600px;height:228px;" onclick="window.open(this.src)" align="right"/></div></div>
+            <div class="log">main_page = &lt;pages.page_objects.main_page.MainPage object at 0x1083d9350&gt;<br/><br/>    def test_main_page_validate_page_10_info(main_page: MainPage) -&gt; None:<br/>        main_page.go_to_page()<br/>        expect(main_page.table_header).to_be_visible()<br/>        main_page.set_text(&quot;10&quot;)<br/>        user_info = main_page.get_data_by_id(&quot;100&quot;, &quot;Name&quot;)<br/>        print(user_info)<br/>&gt;       assert user_info != &quot;null&quot;<br/><span class="error">E       AssertionError: assert &#x27;null&#x27; != &#x27;null&#x27;</span><br/><br/>tests/test_main_page.py:51: AssertionError<br/> ------------------------------Captured stdout call------------------------------ <br/>null
+<br/></div></td></tr></tbody>
+      <tbody class="failed results-table-row">
+        <tr>
+          <td class="col-result">Failed</td>
+          <td class="col-name">tests/test_main_page.py::test_main_page_enter_number_larger_than_number_of_pages_in_textbox_and_verify_app_not_navigated_to_page_1[chromium]</td>
+          <td class="col-duration">1.70</td>
+          <td class="col-links"></td></tr>
+        <tr>
+          <td class="extra" colspan="4">
+            <div><div><img src=".playwright-screenshots/tests-test-main-page-py-test-main-page-enter-number-larger-than-number-of-pages-in-textbox-and-verify-app-not-navigated-to-page-1-chromium.png" style="width:600px;height:228px;" onclick="window.open(this.src)" align="right"/></div></div>
+            <div class="log">main_page = &lt;pages.page_objects.main_page.MainPage object at 0x1083cec10&gt;<br/><br/>    def test_main_page_enter_number_larger_than_number_of_pages_in_textbox_and_verify_app_not_navigated_to_page_1(main_page: MainPage) -&gt; None:<br/>        main_page.go_to_page()<br/>        expect(main_page.table_header).to_be_visible()<br/>        main_page.set_text(&quot;3&quot;)<br/>        main_page.set_text(&quot;44&quot;)<br/>        page_info = main_page.get_all_data_for_a_column(&quot;ID&quot;)<br/>        print(page_info)<br/>&gt;       assert &#x27;1&#x27; not in page_info<br/><span class="error">E       AssertionError: assert &#x27;1&#x27; not in [&#x27;1&#x27;, &#x27;2&#x27;, &#x27;3&#x27;, &#x27;4&#x27;, &#x27;5&#x27;, &#x27;6&#x27;, ...]</span><br/><br/>tests/test_main_page.py:61: AssertionError<br/> ------------------------------Captured stdout call------------------------------ <br/>[&#x27;1&#x27;, &#x27;2&#x27;, &#x27;3&#x27;, &#x27;4&#x27;, &#x27;5&#x27;, &#x27;6&#x27;, &#x27;7&#x27;, &#x27;8&#x27;, &#x27;9&#x27;, &#x27;10&#x27;]
+<br/></div></td></tr></tbody></table></body></html>
