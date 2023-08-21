@@ -13,6 +13,8 @@ class MainPage(BasePage):
         self.text_box = self.page.locator(MainPageLocators.TEXT_BOX)
         self.table_rows = self.page.locator(MainPageLocators.TABLE_ROWS)
         self.add_button = self.page.locator(MainPageLocators.ADD_PERSON_BUTTON)
+        self.right_arrow_button = self.page.locator(MainPageLocators.RIGHT_ARROW_BUTTON)
+        self.left_arrow_button = self.page.locator(MainPageLocators.LEFT_ARROW_BUTTON)
         self.column_headers = self.page.locator(MainPageLocators.COLUMN_HEADERS)
 
     def set_text(self, text):
@@ -61,3 +63,11 @@ class MainPage(BasePage):
             index += 1
 
         return data
+
+    def click_on_right_arrow(self):
+        self.right_arrow_button.click()
+
+    def click_on_left_arrow(self):
+        self.left_arrow_button.click()
+
+
